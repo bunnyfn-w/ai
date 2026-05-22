@@ -43,7 +43,7 @@
         <div class="flex items-center justify-between p-4 bg-[#131314]">
             <div class="flex items-center gap-2">
                 <span class="text-xl font-medium bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">Navi AI</span>
-                <span class="text-xs bg-[#1e1e20] text-gray-400 px-2 py-0.5 rounded">NVIDIA API</span>
+                <span class="text-xs bg-[#1e1e20] text-gray-400 px-2 py-0.5 rounded">Google AI API</span>
             </div>
             <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white">
                 USER
@@ -70,24 +70,35 @@
                     </button>
                 </div>
             </div>
-            <p class="text-center text-xs text-gray-500 mt-2">NVIDIA Llama 3 · meta/llama3-8b-instruct</p>
+            <p class="text-center text-xs text-gray-500 mt-2">Google Gemini · gemini-1.5-flash</p>
         </div>
     </div>
 
-    <script>
-        // ⚠️  IDE ÍRD BE AZ NVIDIA API KULCSODAT:
-        const NVIDIA_API_KEY = "AIzaSyCgRuktoJ4Ign_pGbdodzeWSSdpvM5chdc";
+    <!-- Google Generative AI SDK importálása -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
 
-        // FIX 1: Közvetlen API hívás, allorigins proxy nélkül (az nem tud POST-ot kezelni)
-        const API_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-        const MODEL_NAME = "meta/llama3-8b-instruct";
+    <script type="module">
+        import { GoogleGenAI } from "@google/generative-ai";
+
+        // ⚠️ IDE ÍRD BE A GOOGLE AI API KULCSODAT:
+        const GOOGLE_API_KEY = "AIzaSyCgRuktoJ4Ign_pGbdodzeWSSdpvM5chdc";
+
+        // Az SDK inicializálása
+        const ai = new GoogleGenAI({ apiKey: GOOGLE_API_KEY });
+        // Beállítjuk a modellt (a gemini-1.5-flash rendkívül gyors és tökéletes csevegésre)
+        const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const chatContainer = document.getElementById('chat-container');
         const welcomeScreen = document.getElementById('welcome-screen');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
 
-        // FIX 2: Textarea auto-grow javítva (element.style.scrollHeight → element.scrollHeight)
         function autoGrow(element) {
             element.style.height = "auto";
             element.style.height = element.scrollHeight + "px";
@@ -138,34 +149,12 @@
             const loadingMsg = appendMessage('ai', '<span class="text-gray-400 animate-pulse">Gondolkodom...</span>');
 
             try {
-                // FIX 3: Helyes Content-Type és közvetlen JSON body az NVIDIA API-hoz
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${NVIDIA_API_KEY}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        model: MODEL_NAME,
-                        messages: [{ role: "user", content: text }],
-                        temperature: 0.5,
-                        max_tokens: 1024
-                    })
-                });
+                // A kérés elküldése a Google Gemini API-nak
+                const result = await model.generateContent(text);
+                const response = await result.response;
+                const aiReply = response.text();
 
-                if (!response.ok) {
-                    const errBody = await response.json().catch(() => ({}));
-                    const detail = errBody?.detail || errBody?.message || `HTTP ${response.status}`;
-                    throw new Error(detail);
-                }
-
-                const data = await response.json();
-
-                if (!data.choices || data.choices.length === 0) {
-                    throw new Error("Üres válasz érkezett a szervertől.");
-                }
-
-                const aiReply = data.choices[0].message.content;
+                // Formázás: sortörések cseréje <br>-re a markdown-body-n belül
                 loadingMsg.querySelector('.markdown-body').innerHTML = aiReply.replace(/\n/g, '<br>');
 
             } catch (error) {
@@ -177,7 +166,7 @@
                         </span>
                         <span>${error.message}</span>
                         <span class="text-xs text-red-400/70 mt-2">
-                            💡 Ellenőrizd, hogy az NVIDIA API kulcsod érvényes-e, és van-e elegendő kredited az NVIDIA Build fiókodon.
+                            💡 Ellenőrizd, hogy a Google AI API kulcsod érvényes-e, és nem korlátozza-e valamilyen hálózati hiba.
                         </span>
                     </div>`;
             } finally {
@@ -186,11 +175,15 @@
             }
         }
 
-        function clearChat() {
+        // Globálissá tesszük a törlés funkciót a gomb számára
+        window.clearChat = function() {
             chatContainer.innerHTML = '';
             chatContainer.appendChild(welcomeScreen);
             welcomeScreen.style.display = 'flex';
         }
+        
+        // Globálissá tesszük a küldést is, hogy a HTML gomb elérje
+        window.sendMessage = sendMessage;
     </script>
 </body>
 </html>
